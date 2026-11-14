@@ -8,7 +8,6 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
-# Ortam değişkenlerinden (GitHub Secrets) anahtarları al
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 PIXABAY_API_KEY = (
     os.environ.get("PIXABAY_API_KEY", "").strip()
@@ -33,8 +32,37 @@ def save_used_topic(topic):
         f.write(f"{topic}\n")
 
 
+def get_working_gemini_model():
+    """Hesapta aktif olan güncel Gemini Flash modelini otomatik seçer."""
+    preferred_models = [
+        "gemini-3-flash-preview",
+        "gemini-2.5-flash-latest",
+        "gemini-2.0-flash"
+    ]
+    try:
+        list_url = f"https://generativelanguage.googleapis.com/v1beta/models?key={GEMINI_API_KEY}"
+        res = requests.get(list_url, timeout=20)
+        if res.status_code == 200:
+            models = res.json().get("models", [])
+            available = [
+                m["name"].replace("models/", "")
+                for m in models
+                if "generateContent" in m.get("supportedGenerationMethods", [])
+                and "flash" in m["name"].lower()
+            ]
+            for pref in preferred_models:
+                if pref in available:
+                    return pref
+            if available:
+                return available[0]
+    except Exception as e:
+        print(f"Model listesi uyarısı: {e}")
+    return "gemini-3-flash-preview"
+
+
 def generate_script_with_gemini(used_topics):
-    print("1/5 - Gemini API ile benzersiz İngilizce Shorts senaryosu üretiliyor...")
+    model_name = get_working_gemini_model()
+    print(f"1/5 - Gemini API ({model_name}) ile benzersiz İngilizce Shorts senaryosu üretiliyor...")
     used_str = ", ".join(used_topics[-80:]) if used_topics else "None"
 
     prompt = f"""
@@ -63,7 +91,7 @@ Return ONLY valid JSON with this exact structure:
 }}
 """
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_API_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
@@ -73,6 +101,8 @@ Return ONLY valid JSON with this exact structure:
     }
 
     response = requests.post(url, json=payload, timeout=60)
+    if response.status_code != 200:
+        print("API Yanıt Hatası:", response.text)
     response.raise_for_status()
     data = response.json()
     raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
@@ -118,7 +148,6 @@ def generate_voiceover_and_subtitles(narration_text):
 
 
 def fetch_pixabay_clip(query, filename):
-    """Pixabay Video API üzerinden curl kullanarak stok video indirir."""
     if not PIXABAY_API_KEY:
         return False
 
@@ -157,7 +186,6 @@ def fetch_pixabay_clip(query, filename):
 
 
 def generate_ai_cinematic_clip(query, filename, duration=16.0):
-    """Anahtarsız Yedek Motor: AI sinematik dikey görsel üretip hareketli kamerayla videoya çevirir."""
     prompt_str = f"dark moody cinematic vertical photography of {query}, dramatic lighting, stoic philosophical atmosphere, 8k, no text"
     encoded_prompt = urllib.parse.quote(prompt_str)
     seed = random.randint(1000, 999999)
@@ -186,7 +214,6 @@ def generate_ai_cinematic_clip(query, filename, duration=16.0):
     except Exception as e:
         print(f"AI görsel yedek uyarısı: {e}")
 
-    # Son çare çevrimdışı sinematik koyu arka plan
     subprocess.run([
         "ffmpeg", "-y", "-f", "lavfi",
         "-i", f"color=c=0x12161f:s=1080x1920:r=30:d={duration:.2f}",
@@ -206,14 +233,12 @@ def download_background_videos(search_terms, total_duration):
         filename = f"raw_clip_{idx}.mp4"
         success = False
 
-        # Önce Pixabay API ile dene
         for q in [term, random.choice(fallback_terms)]:
             if fetch_pixabay_clip(q, filename):
                 print(f"Klip {idx + 1}/3 Pixabay üzerinden indirildi ({q}).")
                 success = True
                 break
 
-        # Pixabay anahtarı yoksa veya sonuç çıkmadıysa AI Sinematik Sahne üret
         if not success:
             print(f"Klip {idx + 1}/3 için AI Sinematik Hareketli Sahne üretiliyor ({term})...")
             generate_ai_cinematic_clip(term, filename, segment_duration)
