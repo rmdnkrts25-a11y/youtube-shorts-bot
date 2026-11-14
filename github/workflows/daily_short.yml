@@ -1,0 +1,51 @@
+name: Daily YouTube Shorts Generator
+
+on:
+  schedule:
+    # Her gün Türkiye saati ile 19:00'da (16:00 UTC) otomatik çalışır
+    - cron: '0 16 * * *'
+  workflow_dispatch: # İstediğin an "Run workflow" butonuyla manuel tetiklemeni sağlar
+
+permissions:
+  contents: write
+
+jobs:
+  create-and-upload-short:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Depo Dosyalarını Çek
+        uses: actions/checkout@v4
+
+      - name: FFmpeg ve Yazı Tiplerini Kur
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core curl
+
+      - name: Python 3.11 Kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Gerekli Kütüphaneleri Yükle
+        run: |
+          pip install --upgrade pip
+          pip install requests edge-tts google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2
+
+      - name: Videoyu Üret ve YouTube Kanalına Yükle
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+        run: python main.py
+
+      - name: İşlenen Konuyu Hafızaya Kaydet
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add used_topics.txt
+          git diff --staged --quiet || git commit -m "Yeni video konusu eklendi [skip ci]"
+          git push
