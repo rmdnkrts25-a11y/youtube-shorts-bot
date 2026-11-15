@@ -8,6 +8,7 @@ from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 
+# Ortam değişkenleri (GitHub Secrets)
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 PIXABAY_API_KEY = (
     os.environ.get("PIXABAY_API_KEY", "").strip()
@@ -17,6 +18,8 @@ YOUTUBE_CLIENT_ID = os.environ.get("YOUTUBE_CLIENT_ID", "").strip()
 YOUTUBE_CLIENT_SECRET = os.environ.get("YOUTUBE_CLIENT_SECRET", "").strip()
 YOUTUBE_REFRESH_TOKEN = os.environ.get("YOUTUBE_REFRESH_TOKEN", "").strip()
 
+# Çalışma modu: "short" (Her gün) veya "long" (2 günde bir 11 dk belgesel)
+VIDEO_MODE = os.environ.get("VIDEO_MODE", "short").strip().lower()
 USED_TOPICS_FILE = "used_topics.txt"
 
 
@@ -33,10 +36,9 @@ def save_used_topic(topic):
 
 
 def get_working_gemini_model():
-    """Hesapta aktif olan güncel Gemini Flash modelini otomatik seçer."""
     preferred_models = [
         "gemini-3-flash-preview",
-        "gemini-2.5-flash-latest",
+        "gemini-2.5-flash",
         "gemini-2.0-flash"
     ]
     try:
@@ -60,90 +62,169 @@ def get_working_gemini_model():
     return "gemini-3-flash-preview"
 
 
-def generate_script_with_gemini(used_topics):
+def call_gemini_json(prompt, max_tokens=4096):
     model_name = get_working_gemini_model()
-    print(f"1/5 - Gemini API ({model_name}) ile benzersiz İngilizce Shorts senaryosu üretiliyor...")
-    used_str = ", ".join(used_topics[-80:]) if used_topics else "None"
-
-    prompt = f"""
-You are an expert viral YouTube Shorts scriptwriter for a high-retention channel about dark psychology, stoic paradoxes, cognitive biases, and fascinating historical mysteries.
-
-Previously covered topics (DO NOT repeat any of these): {used_str}
-
-Pick ONE brand new, mind-blowing psychological effect, philosophical paradox, or historical mystery.
-Create a gripping YouTube Short in English that lasts around 40-50 seconds (approx. 95 to 115 words).
-
-Rules for 'narration':
-- Must start with an irresistible hook in the first sentence.
-- Plain spoken English text ONLY. No asterisks, no emojis, no stage directions like [Pause], no hashtags inside narration.
-- End with a seamless loop or thought-provoking twist that makes viewers comment.
-
-Rules for 'search_terms':
-- Provide exactly 3 simple 2-word visual search queries for stock video search (e.g., "dark ocean", "ancient statue", "storm clouds").
-
-Return ONLY valid JSON with this exact structure:
-{{
-  "topic_name": "Name of the Paradox or Effect",
-  "title": "Viral Title Under 60 Characters #shorts",
-  "description": "Engaging 2-sentence description explaining the concept.\\n\\n#psychology #stoicism #mindset #facts #shorts",
-  "narration": "Full spoken English voiceover text here...",
-  "search_terms": ["query one", "query two", "query three"]
-}}
-"""
-
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": 0.85
+            "temperature": 0.82,
+            "maxOutputTokens": max_tokens
         }
     }
-
-    response = requests.post(url, json=payload, timeout=60)
-    if response.status_code != 200:
-        print("API Yanıt Hatası:", response.text)
+    response = requests.post(url, json=payload, timeout=120)
     response.raise_for_status()
     data = response.json()
     raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-    result = json.loads(raw_text)
-
-    if "#shorts" not in result["title"].lower():
-        result["title"] = f"{result['title'][:85]} #shorts"
-
-    print(f"Secilen Konu: {result['topic_name']}")
-    print(f"Baslik: {result['title']}")
-    return result
+    return json.loads(raw_text)
 
 
-def generate_voiceover_and_subtitles(narration_text):
-    print("2/5 - Doğal İngilizce seslendirme ve senkronize altyazı üretiliyor...")
-    voices = [
-        "en-US-ChristopherNeural",
-        "en-US-EricNeural",
-        "en-US-GuyNeural"
-    ]
-    chosen_voice = random.choice(voices)
+def generate_short_script(used_topics):
+    print("1/6 - [SHORTS MODU] Gemini ile yüksek tutma oranlı Shorts senaryosu üretiliyor...")
+    used_str = ", ".join(used_topics[-90:]) if used_topics else "None"
 
-    cmd = [
+    prompt = f"""
+You are a viral YouTube Shorts scriptwriter for 'Mind Paradox Daily', a channel about dark psychology, stoic paradoxes, cognitive biases, and historical mind traps.
+
+Previously covered topics (DO NOT repeat): {used_str}
+
+Pick ONE brand new, fascinating psychological effect or philosophical paradox.
+Write a fast-paced 45-second YouTube Short script in English (105 to 125 words).
+
+Rules for 'narration':
+- Start with a shocking 1-sentence hook that stops scrolling immediately.
+- Plain spoken English text ONLY. No asterisks, no emojis, no stage directions.
+- End with a open loop question that triggers comments.
+
+Rules for 'search_terms':
+- Provide exactly 5 distinct 2-word visual search queries for stock video clips (so the visual changes every 8-9 seconds).
+
+Return ONLY valid JSON:
+{{
+  "topic_name": "Name of the Effect",
+  "title": "Curiosity Gap Title Under 58 Characters #shorts",
+  "description": "2-sentence explanation of the paradox.\\n\\n#psychology #stoicism #darkpsychology #mindset #shorts",
+  "narration": "Full spoken English voiceover text...",
+  "search_terms": ["query 1", "query 2", "query 3", "query 4", "query 5"]
+}}
+"""
+    res = call_gemini_json(prompt, max_tokens=2048)
+    if "#shorts" not in res["title"].lower():
+        res["title"] = f"{res['title'][:85]} #shorts"
+    return res
+
+
+def generate_long_documentary_script(used_topics):
+    """
+    11 dakikalık (~1650-1800 kelime) derin belgesel senaryosunu tek seferde yüzeysel yazmak yerine,
+    5 ayrı bölüm halinde derinlemesine üretip birleştirir. Bu sayede izleyiciyi ekrana kilitleyen
+    gerçek bir mini-belgesel kalitesi ortaya çıkar.
+    """
+    print("1/6 - [11 DK BELGESEL MODU] Ana konu, 5 bölüm planı ve 20 görsel sahne kurgulanıyor...")
+    used_str = ", ".join(used_topics[-90:]) if used_topics else "None"
+
+    outline_prompt = f"""
+You are the lead documentary producer for 'Mind Paradox Daily', a prestigious psychology and philosophy YouTube channel (similar to Aperture, Pursuit of Wonder, and Einzelgänger).
+
+Previously covered topics (DO NOT repeat): {used_str}
+
+Select ONE deep, mesmerizing psychological phenomenon, stoic paradox, or dark human behavior mystery for an 11-minute documentary.
+
+Create a 5-Act Documentary Blueprint and 20 visual scene queries.
+Return ONLY valid JSON with this exact structure:
+{{
+  "topic_name": "Name of the Phenomenon",
+  "title": "Intriguing Documentary Title Under 65 Characters (No hashtags)",
+  "thumbnail_text": "3-4 WORD SHOCKING HOOK",
+  "description": "Compelling 3-sentence YouTube SEO description.\\n\\n00:00 The Hidden Trap\\n02:15 Historical Origins\\n04:30 The Psychological Mechanism\\n06:45 Modern Manipulation\\n09:00 The Stoic Antidote\\n\\n#psychology #stoicism #philosophy #documentary #mindset",
+  "chapters": [
+    {{"act": "Act 1: The Hook & The Unseen Paradox", "focus": "Start with a vivid storytelling scenario and introduce the core mystery."}},
+    {{"act": "Act 2: The Famous Experiment & Historical Roots", "focus": "Detail real historical experiments, philosophers, or thinkers who uncovered this."}},
+    {{"act": "Act 3: Inside the Brain's Blind Spot", "focus": "Explain the deep neuroscience and hidden psychological triggers behind why humans fall for it."}},
+    {{"act": "Act 4: How Modern Society Weaponizes This", "focus": "Real-world examples in relationships, status games, media, and daily life."}},
+    {{"act": "Act 5: The Stoic & Psychological Antidote", "focus": "Actionable mental models to break free and a profound philosophical closing thought."}}
+  ],
+  "search_terms": [
+    "dark ocean", "ancient statue", "chess board", "storm clouds", "crowd walking",
+    "old library", "burning candle", "hourglass sand", "night city", "mirror reflection",
+    "forest fog", "clock gears", "greek temple", "rain window", "stars galaxy",
+    "shadow hallway", "writing fountain", "mountain peak", "eye closeup", "calm waves"
+  ]
+}}
+"""
+    blueprint = call_gemini_json(outline_prompt, max_tokens=2048)
+    print(f"Belgesel Konusu: {blueprint['topic_name']} | Başlık: {blueprint['title']}")
+
+    full_narration_parts = []
+    for idx, ch in enumerate(blueprint["chapters"]):
+        print(f"   -> Bölüm {idx + 1}/5 yazılıyor: {ch['act']} (~350 kelime)...")
+        part_prompt = f"""
+You are narrating Part {idx + 1} of 5 of an 11-minute YouTube documentary titled "{blueprint['title']}" about "{blueprint['topic_name']}".
+
+Current Section: {ch['act']}
+Section Goal: {ch['focus']}
+
+Write between 330 and 360 words of captivating, hypnotic spoken English narration for this section.
+Rules:
+- DO NOT include section titles, headers, or "Welcome back". Flow seamlessly as part of one continuous essay.
+- Plain spoken English text ONLY. No asterisks, no markdown, no [Pause] tags.
+- Use rich storytelling, concrete examples, and rhetorical questions that keep viewers hooked.
+
+Return ONLY valid JSON:
+{{
+  "section_text": "350 words of spoken narration here..."
+}}
+"""
+        part_res = call_gemini_json(part_prompt, max_tokens=2048)
+        full_narration_parts.append(part_res["section_text"].strip())
+
+    blueprint["narration"] = " ".join(full_narration_parts)
+    total_words = len(blueprint["narration"].split())
+    print(f"Belgesel senaryosu tamamlandı: Toplam {total_words} kelime (~11 dakika).")
+    return blueprint
+
+
+def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
+    print("2/6 - Doğal İngilizce seslendirme + Sinematik Dark Ambient arka plan müziği miksleniyor...")
+    chosen_voice = "en-US-ChristopherNeural"
+    rate = "+0%" if is_long else "+5%"
+
+    subprocess.run([
         "edge-tts",
         "--voice", chosen_voice,
-        "--rate=+6%",
+        "--rate=" + rate,
         "--text", narration_text,
-        "--write-media", "voice.mp3",
+        "--write-media", "raw_voice.mp3",
         "--write-subtitles", "subs.vtt"
-    ]
-    subprocess.run(cmd, check=True)
+    ], check=True)
 
     probe_cmd = [
         "ffprobe", "-v", "error",
         "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1",
-        "voice.mp3"
+        "raw_voice.mp3"
     ]
-    out = subprocess.check_output(probe_cmd).decode("utf-8").strip()
-    duration = float(out)
-    print(f"Seslendirme tamamlandı ({duration:.1f} saniye).")
+    duration = float(subprocess.check_output(probe_cmd).decode("utf-8").strip())
+
+    # Telifsiz, derin atmosferik Drone/Pad arka plan sesi üret (110Hz + 165Hz + 220Hz + pembe gürültü filtresi)
+    # ve seslendirmeyle profesyonelce birleştir (Voiceover %100, Ambient Müzik %8 seviyede)
+    ambient_filter = (
+        f"aevalsrc='0.12*sin(2*PI*110*t)+0.08*sin(2*PI*164.81*t)+0.06*sin(2*PI*220*t)+0.03*sin(2*PI*55*t)':s=44100:d={duration:.2f},"
+        "lowpass=f=280,afade=t=in:st=0:d=3,afade=t=out:st=" + f"{max(0, duration - 4):.2f}:d=4[bg];"
+        "[0:a]volume=1.15[vo];"
+        "[vo][bg]amix=inputs=2:duration=first:dropout_transition=2"
+    )
+
+    subprocess.run([
+        "ffmpeg", "-y",
+        "-i", "raw_voice.mp3",
+        "-filter_complex", ambient_filter,
+        "-c:a", "aac", "-b:a", "192k",
+        "voice.m4a"
+    ], check=True)
+
+    print(f"Ses + Atmosferik Müzik Miksajı tamamlandı ({duration / 60:.1f} dakika / {duration:.0f} sn).")
     return duration
 
 
@@ -185,11 +266,14 @@ def fetch_pixabay_clip(query, filename):
     return False
 
 
-def generate_ai_cinematic_clip(query, filename, duration=16.0):
-    prompt_str = f"dark moody cinematic vertical photography of {query}, dramatic lighting, stoic philosophical atmosphere, 8k, no text"
+def generate_ai_cinematic_clip(query, filename, duration, is_long=False):
+    w, h = (1920, 1080) if is_long else (1080, 1920)
+    scale_w, scale_h = (2112, 1188) if is_long else (1220, 2168)
+
+    prompt_str = f"dark moody cinematic photography of {query}, chiaroscuro lighting, stoic philosophical atmosphere, 8k masterpiece, no text"
     encoded_prompt = urllib.parse.quote(prompt_str)
     seed = random.randint(1000, 999999)
-    img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width=1080&height=1920&nologo=true&seed={seed}"
+    img_url = f"https://image.pollinations.ai/prompt/{encoded_prompt}?width={w}&height={h}&nologo=true&seed={seed}"
     img_file = f"temp_{seed}.jpg"
 
     try:
@@ -200,9 +284,9 @@ def generate_ai_cinematic_clip(query, filename, duration=16.0):
         )
         if os.path.exists(img_file) and os.path.getsize(img_file) > 10000:
             vf = (
-                "scale=1220:2168:force_original_aspect_ratio=increase,"
-                "crop=1080:1920:'(iw-ow)/2':'((ih-oh)/2)+((ih-oh)/3)*sin(t/2.5)',"
-                "eq=brightness=-0.12:contrast=1.15,fps=30,format=yuv420p"
+                f"scale={scale_w}:{scale_h}:force_original_aspect_ratio=increase,"
+                f"crop={w}:{h}:'((iw-ow)/2)+((iw-ow)/3)*sin(t/4.0)':'((ih-oh)/2)+((ih-oh)/3)*cos(t/4.0)',"
+                "eq=brightness=-0.12:contrast=1.18:saturation=0.85,fps=30,format=yuv420p"
             )
             subprocess.run([
                 "ffmpeg", "-y", "-loop", "1", "-i", img_file,
@@ -216,49 +300,63 @@ def generate_ai_cinematic_clip(query, filename, duration=16.0):
 
     subprocess.run([
         "ffmpeg", "-y", "-f", "lavfi",
-        "-i", f"color=c=0x12161f:s=1080x1920:r=30:d={duration:.2f}",
+        "-i", f"color=c=0x10141d:s={w}x{h}:r=30:d={duration:.2f}",
         "-c:v", "libx264", "-preset", "veryfast", "-pix_fmt", "yuv420p",
         filename
     ], check=True)
     return True
 
 
-def download_background_videos(search_terms, total_duration):
-    print("3/5 - Arka plan videoları hazırlanıyor (Pixabay API + AI Görsel Motoru)...")
-    fallback_terms = ["dark ocean", "storm clouds", "night city", "forest fog", "stars night"]
-    downloaded_files = []
-    segment_duration = (total_duration / 3.0) + 1.0
+def download_background_videos(search_terms, total_duration, is_long=False):
+    target_count = 20 if is_long else 5
+    print(f"3/6 - {target_count} adet sinematik sahne indiriliyor/üretiliyor...")
+    fallback_terms = [
+        "dark ocean", "storm clouds", "night city", "forest fog", "stars night",
+        "ancient ruins", "candle flame", "clock gears", "chess board", "old library"
+    ]
+    terms = list(search_terms[:target_count])
+    while len(terms) < target_count:
+        terms.append(random.choice(fallback_terms))
 
-    for idx, term in enumerate(search_terms[:3]):
+    downloaded_files = []
+    segment_duration = (total_duration / float(target_count)) + 0.8
+
+    for idx, term in enumerate(terms):
         filename = f"raw_clip_{idx}.mp4"
         success = False
 
-        for q in [term, random.choice(fallback_terms)]:
-            if fetch_pixabay_clip(q, filename):
-                print(f"Klip {idx + 1}/3 Pixabay üzerinden indirildi ({q}).")
-                success = True
-                break
+        # Görsel çeşitlilik için bazı sahneleri Pixabay'dan, bazılarını doğrudan konuya özel AI Sinematik motordan al
+        if idx % 3 != 2:
+            for q in [term, random.choice(fallback_terms)]:
+                if fetch_pixabay_clip(q, filename):
+                    print(f"Sahne {idx + 1}/{target_count} Pixabay HD stok video indirildi ({q}).")
+                    success = True
+                    break
 
         if not success:
-            print(f"Klip {idx + 1}/3 için AI Sinematik Hareketli Sahne üretiliyor ({term})...")
-            generate_ai_cinematic_clip(term, filename, segment_duration)
+            print(f"Sahne {idx + 1}/{target_count} Konuya Özel AI Sinematik Sahne üretiliyor ({term})...")
+            generate_ai_cinematic_clip(term, filename, segment_duration, is_long=is_long)
 
         downloaded_files.append(filename)
 
     return downloaded_files
 
 
-def assemble_final_video(clip_files, total_duration):
-    print("4/5 - FFmpeg ile 1080x1920 dikey montaj ve altyazı gömme işlemi yapılıyor...")
-    segment_duration = (total_duration / len(clip_files)) + 0.4
+def assemble_final_video(clip_files, total_duration, is_long=False):
+    w, h = (1920, 1080) if is_long else (1080, 1920)
+    print(f"4/6 - FFmpeg ile {w}x{h} sinematik renk düzenlemesi, geçişler ve altyazı montajlanıyor...")
+    segment_duration = (total_duration / len(clip_files)) + 0.35
     processed_clips = []
 
     for idx, clip in enumerate(clip_files):
         out_clip = f"norm_clip_{idx}.mp4"
+        fade_out_st = max(0.1, segment_duration - 0.45)
         vf_filter = (
-            "scale=1080:1920:force_original_aspect_ratio=increase,"
-            "crop=1080:1920,"
-            "eq=brightness=-0.14:contrast=1.12,"
+            f"scale={w}:{h}:force_original_aspect_ratio=increase,"
+            f"crop={w}:{h},"
+            "eq=brightness=-0.12:contrast=1.16:saturation=0.88,"
+            "vignette=PI/5,"
+            f"fade=t=in:st=0:d=0.4,fade=t=out:st={fade_out_st:.2f}:d=0.4,"
             "fps=30,format=yuv420p"
         )
         cmd = [
@@ -283,31 +381,70 @@ def assemble_final_video(clip_files, total_duration):
         "-i", "concat_list.txt", "-c", "copy", "merged_bg.mp4"
     ], check=True)
 
-    sub_style = (
-        "subtitles=subs.vtt:force_style='"
-        "Alignment=10,Fontname=DejaVu Sans,Fontsize=16,Bold=1,"
-        "PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,"
-        "BorderStyle=1,Outline=2,Shadow=1,MarginL=25,MarginR=25'"
-    )
+    if is_long:
+        sub_style = (
+            "subtitles=subs.vtt:force_style='"
+            "Alignment=2,Fontname=DejaVu Sans,Fontsize=18,Bold=1,"
+            "PrimaryColour=&H00E6F5FF,OutlineColour=&H00000000,"
+            "BorderStyle=1,Outline=2,Shadow=1,MarginV=38'"
+        )
+    else:
+        sub_style = (
+            "subtitles=subs.vtt:force_style='"
+            "Alignment=10,Fontname=DejaVu Sans,Fontsize=16,Bold=1,"
+            "PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,"
+            "BorderStyle=1,Outline=2,Shadow=1,MarginL=25,MarginR=25'"
+        )
 
-    final_cmd = [
+    output_name = "final_output.mp4"
+    subprocess.run([
         "ffmpeg", "-y",
         "-i", "merged_bg.mp4",
-        "-i", "voice.mp3",
+        "-i", "voice.m4a",
         "-vf", sub_style,
         "-map", "0:v:0",
         "-map", "1:a:0",
-        "-c:v", "libx264", "-preset", "fast", "-crf", "21",
-        "-c:a", "aac", "-b:a", "192k",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
+        "-c:a", "copy",
         "-shortest",
-        "final_short.mp4"
-    ]
-    subprocess.run(final_cmd, check=True)
-    print("Montaj tamamlandı: final_short.mp4 hazır.")
+        output_name
+    ], check=True)
+    print(f"Montaj tamamlandı: {output_name}")
+    return output_name
 
 
-def upload_to_youtube(video_path, title, description):
-    print("5/5 - Video YouTube kanalına otomatik olarak yükleniyor...")
+def generate_custom_thumbnail(topic_name, hook_text):
+    """11 dakikalık videoların tıklanma oranını (CTR) artırmak için özel AI Thumbnail üretir."""
+    print("5/6 - 11 Dakikalık video için yüksek tıklanma oranlı Kapak Fotoğrafı (Thumbnail) üretiliyor...")
+    prompt_str = (
+        f"dark dramatic youtube thumbnail artwork representing {topic_name}, "
+        "ancient stoic marble statue with glowing golden cracks, mysterious cinematic lighting, ultra detailed, 8k"
+    )
+    encoded = urllib.parse.quote(prompt_str)
+    seed = random.randint(1000, 999999)
+    url = f"https://image.pollinations.ai/prompt/{encoded}?width=1280&height=720&nologo=true&seed={seed}"
+    raw_thumb = "raw_thumb.jpg"
+    final_thumb = "thumbnail.jpg"
+
+    try:
+        subprocess.run(["curl", "-s", "-L", "-A", "Mozilla/5.0", "-o", raw_thumb, url], check=True, timeout=45)
+        if os.path.exists(raw_thumb) and os.path.getsize(raw_thumb) > 10000:
+            clean_text = "".join(c for c in hook_text.upper() if c.isalnum() or c == " ")[:28]
+            vf = (
+                "scale=1280:720,eq=brightness=-0.10:contrast=1.25,"
+                f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{clean_text}':"
+                "fontcolor=yellow:fontsize=64:borderw=5:bordercolor=black:x=(w-text_w)/2:y=h-120"
+            )
+            subprocess.run(["ffmpeg", "-y", "-i", raw_thumb, "-vf", vf, final_thumb], check=True)
+            if os.path.exists(final_thumb):
+                return final_thumb
+    except Exception as e:
+        print(f"Thumbnail üretim uyarısı: {e}")
+    return None
+
+
+def upload_to_youtube(video_path, title, description, is_long=False, thumbnail_path=None):
+    print("6/6 - Video YouTube kanalına yükleniyor...")
     creds = Credentials(
         token=None,
         refresh_token=YOUTUBE_REFRESH_TOKEN,
@@ -319,11 +456,15 @@ def upload_to_youtube(video_path, title, description):
 
     youtube = build("youtube", "v3", credentials=creds)
 
+    tags = ["psychology", "stoicism", "philosophy", "dark psychology", "mindset", "human behavior"]
+    if not is_long:
+        tags.append("shorts")
+
     body = {
         "snippet": {
             "title": title[:95],
             "description": description,
-            "tags": ["psychology", "stoicism", "facts", "paradox", "mindset", "shorts"],
+            "tags": tags,
             "categoryId": "27",
             "defaultLanguage": "en",
             "defaultAudioLanguage": "en"
@@ -334,11 +475,27 @@ def upload_to_youtube(video_path, title, description):
         }
     }
 
-    media = MediaFileUpload(video_path, chunksize=-1, resumable=True, mimetype="video/mp4")
+    media = MediaFileUpload(video_path, chunksize=5 * 1024 * 1024, resumable=True, mimetype="video/mp4")
     request = youtube.videos().insert(part="snippet,status", body=body, media_body=media)
-    response = request.execute()
+    response = None
+    while response is None:
+        status, response = request.next_chunk()
+        if status:
+            print(f"Yükleme ilerlemesi: %{int(status.progress() * 100)}")
+
     video_id = response.get("id")
-    print(f"BAŞARILI! Video yayında: https://www.youtube.com/shorts/{video_id}")
+    print(f"BAŞARILI! Video yayında: https://www.youtube.com/watch?v={video_id}")
+
+    if is_long and thumbnail_path and os.path.exists(thumbnail_path):
+        try:
+            youtube.thumbnails().set(
+                videoId=video_id,
+                media_body=MediaFileUpload(thumbnail_path, mimetype="image/jpeg")
+            ).execute()
+            print("Özel Kapak Fotoğrafı (Thumbnail) başarıyla eklendi!")
+        except Exception as e:
+            print(f"Thumbnail yükleme bilgisi: {e}")
+
     return video_id
 
 
@@ -348,14 +505,28 @@ def main():
         YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN
     ]
     if not all(required_keys):
-        raise ValueError("Eksik API anahtarı! Lütfen GEMINI_API_KEY ve YouTube anahtarlarını kontrol edin.")
+        raise ValueError("Eksik API anahtarı! Lütfen GitHub Secrets ayarlarını kontrol edin.")
 
+    is_long = (VIDEO_MODE == "long")
     used_topics = load_used_topics()
-    content = generate_script_with_gemini(used_topics)
-    duration = generate_voiceover_and_subtitles(content["narration"])
-    clips = download_background_videos(content["search_terms"], duration)
-    assemble_final_video(clips, duration)
-    upload_to_youtube("final_short.mp4", content["title"], content["description"])
+
+    if is_long:
+        content = generate_long_documentary_script(used_topics)
+    else:
+        content = generate_short_script(used_topics)
+
+    duration = generate_voiceover_and_ambient_audio(content["narration"], is_long=is_long)
+    clips = download_background_videos(content["search_terms"], duration, is_long=is_long)
+    final_video = assemble_final_video(clips, duration, is_long=is_long)
+
+    thumb_path = None
+    if is_long:
+        thumb_path = generate_custom_thumbnail(
+            content["topic_name"],
+            content.get("thumbnail_text", content["topic_name"])
+        )
+
+    upload_to_youtube(final_video, content["title"], content["description"], is_long=is_long, thumbnail_path=thumb_path)
     save_used_topic(content["topic_name"])
 
 
