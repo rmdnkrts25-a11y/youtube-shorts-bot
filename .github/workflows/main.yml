@@ -1,15 +1,27 @@
-name: Daily YouTube Shorts Generator
+name: Daily Shorts & Bi-Daily 11-Min Documentary
 
 on:
   schedule:
+    # 1) HER GÜN Türkiye saati ile 19:00'da (16:00 UTC) 1 adet Shorts üretir
     - cron: '0 16 * * *'
+    # 2) 2 GÜNDE BİR Türkiye saati ile 21:00'de (18:00 UTC) 11 dakikalık Belgesel üretir
+    - cron: '0 18 */2 * *'
   workflow_dispatch:
+    inputs:
+      video_mode:
+        description: 'Hangi videoyu üretmek istersin? (short = Günlük Shorts, long = 11 Dk Belgesel)'
+        required: true
+        default: 'short'
+        type: choice
+        options:
+          - short
+          - long
 
 permissions:
   contents: write
 
 jobs:
-  create-and-upload-short:
+  create-and-upload-video:
     runs-on: ubuntu-latest
 
     steps:
@@ -31,8 +43,20 @@ jobs:
           pip install --upgrade pip
           pip install requests edge-tts google-api-python-client google-auth google-auth-oauthlib google-auth-httplib2
 
+      - name: Video Modunu Belirle (Shorts veya 11 Dk Belgesel)
+        id: set_mode
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "MODE=${{ github.event.inputs.video_mode }}" >> $GITHUB_ENV
+          elif [ "${{ github.event.schedule }}" == "0 18 */2 * *" ]; then
+            echo "MODE=long" >> $GITHUB_ENV
+          else
+            echo "MODE=short" >> $GITHUB_ENV
+          fi
+
       - name: Videoyu Üret ve YouTube Kanalına Yükle
         env:
+          VIDEO_MODE: ${{ env.MODE }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
