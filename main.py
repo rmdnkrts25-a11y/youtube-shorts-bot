@@ -1,5 +1,6 @@
 import os
 import json
+import time
 import random
 import subprocess
 import urllib.parse
@@ -62,22 +63,66 @@ def get_working_gemini_model():
     return "gemini-3-flash-preview"
 
 
-def call_gemini_json(prompt, max_tokens=4096):
+def call_gemini_json(prompt, max_tokens=8192):
+    """JSON çıktısını yüksek token limiti ve otomatik yeniden deneme ile güvenli şekilde alır."""
     model_name = get_working_gemini_model()
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
+            "temperature": 0.8,
+            "maxOutputTokens": max_tokens
+        }
+    }
+
+    last_err = None
+    for attempt in range(3):
+        try:
+            response = requests.post(url, json=payload, timeout=120)
+            response.raise_for_status()
+            data = response.json()
+            raw_text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            if raw_text.startswith("```"):
+                raw_text = raw_text.split("\n", 1)[-1]
+                if raw_text.endswith("```"):
+                    raw_text = raw_text[:-3].strip()
+            return json.loads(raw_text)
+        except Exception as e:
+            last_err = e
+            print(f"JSON yanıt uyarısı (Deneme {attempt + 1}/3): {e}")
+            time.sleep(2)
+    raise last_err
+
+
+def call_gemini_text(prompt, max_tokens=8192):
+    """Uzun belgesel bölümlerini JSON kısıtlaması olmadan kesintisiz saf metin olarak alır."""
+    model_name = get_working_gemini_model()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_API_KEY}"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {
             "temperature": 0.82,
             "maxOutputTokens": max_tokens
         }
     }
-    response = requests.post(url, json=payload, timeout=120)
-    response.raise_for_status()
-    data = response.json()
-    raw_text = data["candidates"][0]["content"]["parts"][0]["text"]
-    return json.loads(raw_text)
+
+    last_err = None
+    for attempt in range(3):
+        try:
+            response = requests.post(url, json=payload, timeout=120)
+            response.raise_for_status()
+            data = response.json()
+            text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
+            # Olası markdown işaretlerini temizle
+            text = text.replace("**", "").replace("##", "").replace("#", "").strip()
+            if len(text.split()) >= 150:
+                return text
+        except Exception as e:
+            last_err = e
+            print(f"Metin üretim uyarısı (Deneme {attempt + 1}/3): {e}")
+            time.sleep(2)
+    raise last_err if last_err else ValueError("Bölüm metni üretilemedi.")
 
 
 def generate_short_script(used_topics):
@@ -95,10 +140,10 @@ Write a fast-paced 45-second YouTube Short script in English (105 to 125 words).
 Rules for 'narration':
 - Start with a shocking 1-sentence hook that stops scrolling immediately.
 - Plain spoken English text ONLY. No asterisks, no emojis, no stage directions.
-- End with a open loop question that triggers comments.
+- End with an open loop question that triggers comments.
 
 Rules for 'search_terms':
-- Provide exactly 5 distinct 2-word visual search queries for stock video clips (so the visual changes every 8-9 seconds).
+- Provide exactly 5 distinct 2-word visual search queries for stock video clips.
 
 Return ONLY valid JSON:
 {{
@@ -109,18 +154,13 @@ Return ONLY valid JSON:
   "search_terms": ["query 1", "query 2", "query 3", "query 4", "query 5"]
 }}
 """
-    res = call_gemini_json(prompt, max_tokens=2048)
+    res = call_gemini_json(prompt, max_tokens=8192)
     if "#shorts" not in res["title"].lower():
         res["title"] = f"{res['title'][:85]} #shorts"
     return res
 
 
 def generate_long_documentary_script(used_topics):
-    """
-    11 dakikalık (~1650-1800 kelime) derin belgesel senaryosunu tek seferde yüzeysel yazmak yerine,
-    5 ayrı bölüm halinde derinlemesine üretip birleştirir. Bu sayede izleyiciyi ekrana kilitleyen
-    gerçek bir mini-belgesel kalitesi ortaya çıkar.
-    """
     print("1/6 - [11 DK BELGESEL MODU] Ana konu, 5 bölüm planı ve 20 görsel sahne kurgulanıyor...")
     used_str = ", ".join(used_topics[-90:]) if used_topics else "None"
 
@@ -135,7 +175,7 @@ Create a 5-Act Documentary Blueprint and 20 visual scene queries.
 Return ONLY valid JSON with this exact structure:
 {{
   "topic_name": "Name of the Phenomenon",
-  "title": "Intriguing Documentary Title Under 65 Characters (No hashtags)",
+  "title": "Intriguing Documentary Title Under 65 Characters",
   "thumbnail_text": "3-4 WORD SHOCKING HOOK",
   "description": "Compelling 3-sentence YouTube SEO description.\\n\\n00:00 The Hidden Trap\\n02:15 Historical Origins\\n04:30 The Psychological Mechanism\\n06:45 Modern Manipulation\\n09:00 The Stoic Antidote\\n\\n#psychology #stoicism #philosophy #documentary #mindset",
   "chapters": [
@@ -153,7 +193,7 @@ Return ONLY valid JSON with this exact structure:
   ]
 }}
 """
-    blueprint = call_gemini_json(outline_prompt, max_tokens=2048)
+    blueprint = call_gemini_json(outline_prompt, max_tokens=8192)
     print(f"Belgesel Konusu: {blueprint['topic_name']} | Başlık: {blueprint['title']}")
 
     full_narration_parts = []
@@ -165,19 +205,15 @@ You are narrating Part {idx + 1} of 5 of an 11-minute YouTube documentary titled
 Current Section: {ch['act']}
 Section Goal: {ch['focus']}
 
-Write between 330 and 360 words of captivating, hypnotic spoken English narration for this section.
-Rules:
-- DO NOT include section titles, headers, or "Welcome back". Flow seamlessly as part of one continuous essay.
+Write between 330 and 370 words of captivating, hypnotic spoken English narration for this section.
+Strict Rules:
+- Output ONLY the spoken paragraphs. Do NOT include any titles, headers, labels, bullet points, or "Part 1".
+- Flow seamlessly as part of one continuous essay.
 - Plain spoken English text ONLY. No asterisks, no markdown, no [Pause] tags.
-- Use rich storytelling, concrete examples, and rhetorical questions that keep viewers hooked.
-
-Return ONLY valid JSON:
-{{
-  "section_text": "350 words of spoken narration here..."
-}}
+- Use rich storytelling, concrete psychological examples, and thought-provoking insights.
 """
-        part_res = call_gemini_json(part_prompt, max_tokens=2048)
-        full_narration_parts.append(part_res["section_text"].strip())
+        section_text = call_gemini_text(part_prompt, max_tokens=8192)
+        full_narration_parts.append(section_text)
 
     blueprint["narration"] = " ".join(full_narration_parts)
     total_words = len(blueprint["narration"].split())
@@ -207,8 +243,6 @@ def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
     ]
     duration = float(subprocess.check_output(probe_cmd).decode("utf-8").strip())
 
-    # Telifsiz, derin atmosferik Drone/Pad arka plan sesi üret (110Hz + 165Hz + 220Hz + pembe gürültü filtresi)
-    # ve seslendirmeyle profesyonelce birleştir (Voiceover %100, Ambient Müzik %8 seviyede)
     ambient_filter = (
         f"aevalsrc='0.12*sin(2*PI*110*t)+0.08*sin(2*PI*164.81*t)+0.06*sin(2*PI*220*t)+0.03*sin(2*PI*55*t)':s=44100:d={duration:.2f},"
         "lowpass=f=280,afade=t=in:st=0:d=3,afade=t=out:st=" + f"{max(0, duration - 4):.2f}:d=4[bg];"
@@ -325,7 +359,6 @@ def download_background_videos(search_terms, total_duration, is_long=False):
         filename = f"raw_clip_{idx}.mp4"
         success = False
 
-        # Görsel çeşitlilik için bazı sahneleri Pixabay'dan, bazılarını doğrudan konuya özel AI Sinematik motordan al
         if idx % 3 != 2:
             for q in [term, random.choice(fallback_terms)]:
                 if fetch_pixabay_clip(q, filename):
@@ -414,7 +447,6 @@ def assemble_final_video(clip_files, total_duration, is_long=False):
 
 
 def generate_custom_thumbnail(topic_name, hook_text):
-    """11 dakikalık videoların tıklanma oranını (CTR) artırmak için özel AI Thumbnail üretir."""
     print("5/6 - 11 Dakikalık video için yüksek tıklanma oranlı Kapak Fotoğrafı (Thumbnail) üretiliyor...")
     prompt_str = (
         f"dark dramatic youtube thumbnail artwork representing {topic_name}, "
