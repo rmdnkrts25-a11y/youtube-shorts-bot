@@ -134,7 +134,7 @@ You are an elite viral YouTube Shorts scriptwriter for 'Mind Paradox Daily' (dar
 
 Previously covered topics (DO NOT repeat): {used_str}
 
-Pick ONE brand new, mind-bending psychological effect or paradox.
+Pick ONE brand new, mind-bending psychological effect or paradox (such as stubbornness loops, overthinking traps, silent manipulation, cognitive dissonance).
 Write an ultra-tight, punchy 26-to-29-second YouTube Short script in English (STRICTLY 65 to 78 words total).
 
 CRITICAL RETENTION RULES FOR 'narration':
@@ -142,10 +142,8 @@ CRITICAL RETENTION RULES FOR 'narration':
 2. HIGH-PACING & ZERO FLUFF: Every single sentence must deliver a psychological revelation. Keep sentences crisp and rhythmic.
 3. SEAMLESS LOOP ENDING: The final clause MUST grammatically and seamlessly flow directly into the very first word of the script so viewers loop the video without noticing!
    Example of seamless loop:
-   - First sentence: "you unconsciously trust people who mirror your exact posture."
+   - First sentence: "You unconsciously trust people who mirror your exact posture."
    - Last sentence: "...and that is the dark psychological reason why"
-   (When looped: "...and that is the dark psychological reason why you unconsciously trust people who mirror your exact posture.")
-   Note: Capitalize the first letter of the narration normally, and end the final sentence without a period (or with a comma/flow) so it connects smoothly back to the start.
 4. Plain spoken English text ONLY. No asterisks, no emojis, no stage directions.
 
 Rules for 'search_terms':
@@ -155,7 +153,7 @@ Return ONLY valid JSON:
 {{
   "topic_name": "Name of the Effect",
   "title": "Curiosity Gap Title Under 55 Characters #shorts",
-  "description": "2-sentence punchy explanation of the psychological trap.\\n\\n#psychology #stoicism #darkpsychology #mindset #shorts",
+  "description": "2-sentence punchy explanation of the psychological trap.\\n\\nQuestion for you: Have you ever noticed this pattern in your own life? Share your thoughts below.\\n\\n#psychology #stoicism #darkpsychology #mindset #shorts",
   "narration": "Full spoken English voiceover text (65-78 words)...",
   "search_terms": ["query 1", "query 2", "query 3", "query 4", "query 5", "query 6", "query 7", "query 8"]
 }}
@@ -167,29 +165,36 @@ Return ONLY valid JSON:
 
 
 def generate_long_documentary_script(used_topics):
-    print("1/6 - [11 DK BELGESEL MODU] Ana konu, 5 bölüm planı ve 20 görsel sahne kurgulanıyor...")
+    print("1/6 - [11 DK BELGESEL MODU] Duygu odaklı başlık, yüksek CTR kapak ve 5 bölüm planlanıyor...")
     used_str = ", ".join(used_topics[-90:]) if used_topics else "None"
+    recent_shorts_hint = ", ".join(used_topics[-5:]) if used_topics else "overthinking, stubborn mind loops, quiet dissatisfaction"
 
     outline_prompt = f"""
 You are the lead documentary producer for 'Mind Paradox Daily', a prestigious psychology and philosophy YouTube channel (similar to Aperture, Pursuit of Wonder, and Einzelgänger).
 
-Previously covered topics (DO NOT repeat): {used_str}
+Previously used long documentary topics (DO NOT repeat): {used_str}
+Recent channel themes (great for deep-dive companion videos): {recent_shorts_hint}
 
-Select ONE deep, mesmerizing psychological phenomenon, stoic paradox, or dark human behavior mystery for an 11-minute documentary.
+Select ONE deep, relatable human psychological struggle (such as chronic dissatisfaction, stubbornness loops, fear of stillness, emotional exhaustion, self-sabotage, or silent social traps) for an 11-minute documentary.
 
-Create a 5-Act Documentary Blueprint and 20 visual scene queries.
+CRITICAL CTR & RETENTION RULES:
+1. EMOTION-DRIVEN TITLE (NO JARGON): Do NOT put academic/technical terms in the title! Focus directly on the raw human emotion, quiet pain, or everyday frustration the viewer feels (e.g., "Why Nothing You Achieve Ever Feels Like Enough", "Why Your Mind Refuses to Let Go of What Hurts You"). Under 62 characters.
+2. HIGH-CONTRAST THUMBNAIL HOOK: 'thumbnail_text' MUST be 1 to 2 MASSIVE, ultra-readable words (MAX 13 characters, e.g., "NEVER ENOUGH", "MIND TRAP", "LET IT GO", "WAKE UP").
+3. CHAPTER TITLES: Make the 5 chapter titles intriguing and relatable so viewers click timestamps.
+
 Return ONLY valid JSON with this exact structure:
 {{
-  "topic_name": "Name of the Phenomenon",
-  "title": "Intriguing Documentary Title Under 65 Characters",
-  "thumbnail_text": "3-4 WORD SHOCKING HOOK",
-  "description": "Compelling 3-sentence YouTube SEO description.\\n\\n00:00 The Hidden Trap\\n02:15 Historical Origins\\n04:30 The Psychological Mechanism\\n06:45 Modern Manipulation\\n09:00 The Stoic Antidote\\n\\n#psychology #stoicism #philosophy #documentary #mindset",
+  "topic_name": "Core Psychological Struggle",
+  "title": "Emotion-Driven Relatable Title Under 62 Characters",
+  "thumbnail_text": "1-2 WORDS MAX",
+  "description_intro": "Compelling 3-sentence YouTube SEO description focused on the viewer's life transformation.",
+  "discussion_question": "A thought-provoking question asking viewers to share their personal experience in the comments.",
   "chapters": [
-    {{"act": "Act 1: The Hook & The Unseen Paradox", "focus": "Start with a vivid storytelling scenario and introduce the core mystery."}},
-    {{"act": "Act 2: The Famous Experiment & Historical Roots", "focus": "Detail real historical experiments, philosophers, or thinkers who uncovered this."}},
-    {{"act": "Act 3: Inside the Brain's Blind Spot", "focus": "Explain the deep neuroscience and hidden psychological triggers behind why humans fall for it."}},
-    {{"act": "Act 4: How Modern Society Weaponizes This", "focus": "Real-world examples in relationships, status games, media, and daily life."}},
-    {{"act": "Act 5: The Stoic & Psychological Antidote", "focus": "Actionable mental models to break free and a profound philosophical closing thought."}}
+    {{"title": "The Quiet Trap You Feel Every Day", "focus": "FIRST 60 SECONDS HOOK: Skip textbook definitions! Open with a deeply relatable emotional scene and make a crystal-clear promise of what will change in the viewer's life by watching until the end."}},
+    {{"title": "Why Your Brain Keeps Repeating This Loop", "focus": "Detail real historical experiments, philosophers, or thinkers who uncovered why the human mind gets stuck here."}},
+    {{"title": "The Hidden Cost Nobody Talks About", "focus": "Explain the deep neuroscience and hidden psychological triggers quietly draining their energy and peace."}},
+    {{"title": "How Modern Life Feeds Your Restlessness", "focus": "Real-world examples in relationships, status games, phones, and daily habits."}},
+    {{"title": "How to Permanently Break Free", "focus": "Actionable stoic & psychological mental models to rewire this habit, ending with a profound closing thought and a gentle invitation to subscribe for deeper clarity."}}
   ],
   "search_terms": [
     "dark ocean", "ancient statue", "chess board", "storm clouds", "crowd walking",
@@ -203,28 +208,78 @@ Return ONLY valid JSON with this exact structure:
     print(f"Belgesel Konusu: {blueprint['topic_name']} | Başlık: {blueprint['title']}")
 
     full_narration_parts = []
-    for idx, ch in enumerate(blueprint["chapters"]):
-        print(f"   -> Bölüm {idx + 1}/5 yazılıyor: {ch['act']} (~350 kelime)...")
-        part_prompt = f"""
-You are narrating Part {idx + 1} of 5 of an 11-minute YouTube documentary titled "{blueprint['title']}" about "{blueprint['topic_name']}".
+    chapter_word_counts = []
 
-Current Section: {ch['act']}
-Section Goal: {ch['focus']}
+    for idx, ch in enumerate(blueprint["chapters"]):
+        print(f"   -> Bölüm {idx + 1}/5 yazılıyor: {ch['title']} (~350 kelime)...")
+        intro_rule = ""
+        if idx == 0:
+            intro_rule = (
+                "CRITICAL FIRST-60-SECONDS RULE: Do NOT start with dry academic definitions or history! "
+                "Start immediately with a vivid, intimate second-person ('you') emotional experience the viewer recognizes instantly, "
+                "and explicitly promise how watching this video to the end will permanently change how they handle this feeling."
+            )
+
+        part_prompt = f"""
+You are narrating Part {idx + 1} of 5 of an 11-minute YouTube documentary titled "{blueprint['title']}".
+
+Current Chapter: {ch['title']}
+Chapter Goal: {ch['focus']}
+{intro_rule}
 
 Write between 330 and 370 words of captivating, hypnotic spoken English narration for this section.
 Strict Rules:
 - Output ONLY the spoken paragraphs. Do NOT include any titles, headers, labels, bullet points, or "Part 1".
 - Flow seamlessly as part of one continuous essay.
 - Plain spoken English text ONLY. No asterisks, no markdown, no [Pause] tags.
-- Use rich storytelling, concrete psychological examples, and thought-provoking insights.
+- Use rich storytelling, concrete psychological examples, and deeply relatable insights.
 """
         section_text = call_gemini_text(part_prompt, max_tokens=8192)
         full_narration_parts.append(section_text)
+        chapter_word_counts.append(len(section_text.split()))
 
     blueprint["narration"] = " ".join(full_narration_parts)
-    total_words = len(blueprint["narration"].split())
+    blueprint["chapter_word_counts"] = chapter_word_counts
+    total_words = sum(chapter_word_counts)
     print(f"Belgesel senaryosu tamamlandı: Toplam {total_words} kelime (~11 dakika).")
     return blueprint
+
+
+def format_timestamp(seconds):
+    mins = int(seconds // 60)
+    secs = int(seconds % 60)
+    return f"{mins:02d}:{secs:02d}"
+
+
+def build_long_description_with_timestamps(blueprint, total_duration):
+    """5 bölümün gerçek kelime oranlarına göre milimetrik YouTube zaman damgaları ve etkileşim sorusu oluşturur."""
+    intro = blueprint.get("description_intro", "").strip()
+    question = blueprint.get(
+        "discussion_question",
+        "Which part of this video resonated with your current life the most? Let us know in the comments."
+    ).strip()
+    chapters = blueprint.get("chapters", [])
+    word_counts = blueprint.get("chapter_word_counts", [])
+    total_words = sum(word_counts) or 1
+
+    lines = [
+        intro,
+        "",
+        f"💬 Reflection Question: {question}",
+        "",
+        "Chapters:"
+    ]
+    elapsed = 0.0
+    for idx, ch in enumerate(chapters):
+        ts = "00:00" if idx == 0 else format_timestamp(elapsed)
+        lines.append(f"{ts} {ch['title']}")
+        if idx < len(word_counts):
+            elapsed += total_duration * (word_counts[idx] / total_words)
+
+    lines.append("")
+    lines.append("Subscribe to Mind Paradox Daily for deep psychological & stoic documentaries every week.")
+    lines.append("#psychology #stoicism #philosophy #documentary #mindset #selfimprovement")
+    return "\n".join(lines)
 
 
 def _vtt_time_to_seconds(t_str):
@@ -282,7 +337,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if not words or end_s <= start_s:
             continue
 
-        # 2-3 kelimelik dinamik bloklara böl
         chunks = []
         i = 0
         while i < len(words):
@@ -298,7 +352,6 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             dur = (end_s - start_s) * (chunk_chars / total_chars)
             next_t = end_s if idx == len(chunks) - 1 else min(end_s, curr_t + dur)
 
-            # En uzun/vurgulu kelimeyi parlak sarı (&H0000FFFF&) yap
             upper_words = [w.upper() for w in chunk]
             longest_idx = max(range(len(upper_words)), key=lambda k: len(re.sub(r"\W", "", upper_words[k])))
             formatted_words = []
@@ -325,7 +378,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
     print("2/6 - Doğal İngilizce seslendirme + Sinematik Dark Ambient arka plan müziği miksleniyor...")
-    chosen_voice = "en-US-ChristopherNeural"
+    # Tekdüze yapay içerik (Repetitious content) algısını önlemek için doğal belgesel sesleri rotasyonu
+    voices = [
+        "en-US-ChristopherNeural",
+        "en-US-EricNeural",
+        "en-US-GuyNeural",
+        "en-US-RogerNeural"
+    ]
+    chosen_voice = random.choice(voices)
     rate = "+0%" if is_long else "+8%"
 
     subprocess.run([
@@ -345,10 +405,12 @@ def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
     ]
     duration = float(subprocess.check_output(probe_cmd).decode("utf-8").strip())
 
+    # Her videoda benzersiz akustik parmak izi için hafif frekans varyasyonu
+    base_f = random.choice([108, 110, 112, 115])
     fade_out_d = 4.0 if is_long else 0.8
     fade_out_st = max(0.0, duration - fade_out_d)
     ambient_filter = (
-        f"aevalsrc='0.12*sin(2*PI*110*t)+0.08*sin(2*PI*164.81*t)+0.06*sin(2*PI*220*t)+0.03*sin(2*PI*55*t)':s=44100:d={duration:.2f},"
+        f"aevalsrc='0.12*sin(2*PI*{base_f}*t)+0.08*sin(2*PI*164.81*t)+0.06*sin(2*PI*{base_f*2}*t)+0.03*sin(2*PI*{base_f/2}*t)':s=44100:d={duration:.2f},"
         f"lowpass=f=280,afade=t=in:st=0:d=1.5,afade=t=out:st={fade_out_st:.2f}:d={fade_out_d:.2f}[bg];"
         "[0:a]volume=1.18[vo];"
         "[vo][bg]amix=inputs=2:duration=first:dropout_transition=2"
@@ -362,7 +424,7 @@ def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
         "voice.m4a"
     ], check=True)
 
-    print(f"Ses + Atmosferik Müzik Miksajı tamamlandı ({duration / 60:.1f} dakika / {duration:.1f} sn).")
+    print(f"Ses ({chosen_voice}) + Atmosferik Müzik Miksajı tamamlandı ({duration / 60:.1f} dakika / {duration:.1f} sn).")
     return duration
 
 
@@ -446,7 +508,6 @@ def generate_ai_cinematic_clip(query, filename, duration, is_long=False):
 
 
 def download_background_videos(search_terms, total_duration, is_long=False):
-    # Shorts için 8 sahne (~3.3 sn/sahne) yüksek tempo sağlar; Long için 20 sahne
     target_count = 20 if is_long else 8
     print(f"3/6 - {target_count} adet sinematik sahne indiriliyor/üretiliyor...")
     fallback_terms = [
@@ -556,10 +617,11 @@ def assemble_final_video(clip_files, total_duration, is_long=False):
 
 
 def generate_custom_thumbnail(topic_name, hook_text):
-    print("5/6 - 11 Dakikalık video için yüksek tıklanma oranlı Kapak Fotoğrafı (Thumbnail) üretiliyor...")
+    print("5/6 - 11 Dakikalık video için yüksek zıtlıklı, sade ve dev yazılı Kapak Fotoğrafı (Thumbnail) üretiliyor...")
     prompt_str = (
-        f"dark dramatic youtube thumbnail artwork representing {topic_name}, "
-        "ancient stoic marble statue with glowing golden cracks, mysterious cinematic lighting, ultra detailed, 8k"
+        f"minimalist high-contrast youtube thumbnail artwork about {topic_name}, "
+        "single glowing golden silhouette standing in pitch black obsidian void, dramatic rim lighting, "
+        "stark color contrast, clean negative space, cinematic 8k, absolutely no text"
     )
     encoded = urllib.parse.quote(prompt_str)
     seed = random.randint(1000, 999999)
@@ -570,11 +632,14 @@ def generate_custom_thumbnail(topic_name, hook_text):
     try:
         subprocess.run(["curl", "-s", "-L", "-A", "Mozilla/5.0", "-o", raw_thumb, url], check=True, timeout=45)
         if os.path.exists(raw_thumb) and os.path.getsize(raw_thumb) > 10000:
-            clean_text = "".join(c for c in hook_text.upper() if c.isalnum() or c == " ")[:28]
+            words = ["".join(c for c in w.upper() if c.isalnum()) for w in hook_text.split()]
+            words = [w for w in words if w][:2]
+            clean_text = " ".join(words)[:14] if words else "WAKE UP"
+
             vf = (
-                "scale=1280:720,eq=brightness=-0.10:contrast=1.25,"
+                "scale=1280:720,eq=brightness=-0.12:contrast=1.32:saturation=1.15,"
                 f"drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:text='{clean_text}':"
-                "fontcolor=yellow:fontsize=64:borderw=5:bordercolor=black:x=(w-text_w)/2:y=h-120"
+                "fontcolor=#FFD700:fontsize=104:borderw=8:bordercolor=black:x=(w-text_w)/2:y=h-155"
             )
             subprocess.run(["ffmpeg", "-y", "-i", raw_thumb, "-vf", vf, final_thumb], check=True)
             if os.path.exists(final_thumb):
@@ -662,12 +727,15 @@ def main():
 
     thumb_path = None
     if is_long:
+        final_description = build_long_description_with_timestamps(content, duration)
         thumb_path = generate_custom_thumbnail(
             content["topic_name"],
             content.get("thumbnail_text", content["topic_name"])
         )
+    else:
+        final_description = content.get("description", "")
 
-    upload_to_youtube(final_video, content["title"], content["description"], is_long=is_long, thumbnail_path=thumb_path)
+    upload_to_youtube(final_video, content["title"], final_description, is_long=is_long, thumbnail_path=thumb_path)
     save_used_topic(content["topic_name"])
 
 
