@@ -1,4 +1,5 @@
 import os
+import re
 import json
 import time
 import random
@@ -71,7 +72,7 @@ def call_gemini_json(prompt, max_tokens=8192):
         "contents": [{"parts": [{"text": prompt}]}],
         "generationConfig": {
             "responseMimeType": "application/json",
-            "temperature": 0.8,
+            "temperature": 0.85,
             "maxOutputTokens": max_tokens
         }
     }
@@ -114,7 +115,6 @@ def call_gemini_text(prompt, max_tokens=8192):
             response.raise_for_status()
             data = response.json()
             text = data["candidates"][0]["content"]["parts"][0]["text"].strip()
-            # Olası markdown işaretlerini temizle
             text = text.replace("**", "").replace("##", "").replace("#", "").strip()
             if len(text.split()) >= 150:
                 return text
@@ -126,32 +126,38 @@ def call_gemini_text(prompt, max_tokens=8192):
 
 
 def generate_short_script(used_topics):
-    print("1/6 - [SHORTS MODU] Gemini ile yüksek tutma oranlı Shorts senaryosu üretiliyor...")
+    print("1/6 - [SHORTS MODU] 27 sn yüksek tempolu + Seamless Loop senaryosu üretiliyor...")
     used_str = ", ".join(used_topics[-90:]) if used_topics else "None"
 
     prompt = f"""
-You are a viral YouTube Shorts scriptwriter for 'Mind Paradox Daily', a channel about dark psychology, stoic paradoxes, cognitive biases, and historical mind traps.
+You are an elite viral YouTube Shorts scriptwriter for 'Mind Paradox Daily' (dark psychology, stoic paradoxes, cognitive traps).
 
 Previously covered topics (DO NOT repeat): {used_str}
 
-Pick ONE brand new, fascinating psychological effect or philosophical paradox.
-Write a fast-paced 45-second YouTube Short script in English (105 to 125 words).
+Pick ONE brand new, mind-bending psychological effect or paradox.
+Write an ultra-tight, punchy 26-to-29-second YouTube Short script in English (STRICTLY 65 to 78 words total).
 
-Rules for 'narration':
-- Start with a shocking 1-sentence hook that stops scrolling immediately.
-- Plain spoken English text ONLY. No asterisks, no emojis, no stage directions.
-- End with an open loop question that triggers comments.
+CRITICAL RETENTION RULES FOR 'narration':
+1. RAZOR-SHARP 3-SECOND HOOK: Start immediately with a shocking question or provocative claim. ZERO greetings, ZERO channel intros, ZERO slow setup.
+2. HIGH-PACING & ZERO FLUFF: Every single sentence must deliver a psychological revelation. Keep sentences crisp and rhythmic.
+3. SEAMLESS LOOP ENDING: The final clause MUST grammatically and seamlessly flow directly into the very first word of the script so viewers loop the video without noticing!
+   Example of seamless loop:
+   - First sentence: "you unconsciously trust people who mirror your exact posture."
+   - Last sentence: "...and that is the dark psychological reason why"
+   (When looped: "...and that is the dark psychological reason why you unconsciously trust people who mirror your exact posture.")
+   Note: Capitalize the first letter of the narration normally, and end the final sentence without a period (or with a comma/flow) so it connects smoothly back to the start.
+4. Plain spoken English text ONLY. No asterisks, no emojis, no stage directions.
 
 Rules for 'search_terms':
-- Provide exactly 5 distinct 2-word visual search queries for stock video clips.
+- Provide exactly 8 distinct 2-word dark/cinematic visual search queries (so scenes cut every ~3.2 seconds for maximum retention).
 
 Return ONLY valid JSON:
 {{
   "topic_name": "Name of the Effect",
-  "title": "Curiosity Gap Title Under 58 Characters #shorts",
-  "description": "2-sentence explanation of the paradox.\\n\\n#psychology #stoicism #darkpsychology #mindset #shorts",
-  "narration": "Full spoken English voiceover text...",
-  "search_terms": ["query 1", "query 2", "query 3", "query 4", "query 5"]
+  "title": "Curiosity Gap Title Under 55 Characters #shorts",
+  "description": "2-sentence punchy explanation of the psychological trap.\\n\\n#psychology #stoicism #darkpsychology #mindset #shorts",
+  "narration": "Full spoken English voiceover text (65-78 words)...",
+  "search_terms": ["query 1", "query 2", "query 3", "query 4", "query 5", "query 6", "query 7", "query 8"]
 }}
 """
     res = call_gemini_json(prompt, max_tokens=8192)
@@ -221,10 +227,106 @@ Strict Rules:
     return blueprint
 
 
+def _vtt_time_to_seconds(t_str):
+    parts = t_str.strip().replace(",", ".").split(":")
+    if len(parts) == 3:
+        return int(parts[0]) * 3600 + int(parts[1]) * 60 + float(parts[2])
+    elif len(parts) == 2:
+        return int(parts[0]) * 60 + float(parts[1])
+    return 0.0
+
+
+def _seconds_to_ass_time(sec):
+    sec = max(0.0, sec)
+    h = int(sec // 3600)
+    m = int((sec % 3600) // 60)
+    s = int(sec % 60)
+    cs = int(round((sec - int(sec)) * 100))
+    if cs >= 100:
+        cs = 99
+    return f"{h}:{m:02d}:{s:02d}.{cs:02d}"
+
+
+def build_dynamic_shorts_ass(vtt_path="subs.vtt", ass_path="dynamic_subs.ass"):
+    """VTT altyazısını 2-3 kelimelik hızlı, büyük ve anahtar kelimeleri sarı vurgulayan ASS formatına çevirir."""
+    header = """[Script Info]
+ScriptType: v4.00+
+PlayResX: 1080
+PlayResY: 1920
+WrapStyle: 2
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: ViralShorts,DejaVu Sans,76,&H00FFFFFF,&H0000FFFF,&H00000000,&H80000000,-1,0,0,0,100,100,1,0,1,6,3,5,60,60,120,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    if not os.path.exists(vtt_path):
+        return False
+
+    with open(vtt_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    pattern = re.compile(
+        r"(\d{1,2}:\d{2}:\d{2}[\.,]\d{3}|\d{1,2}:\d{2}[\.,]\d{3})\s*-->\s*(\d{1,2}:\d{2}:\d{2}[\.,]\d{3}|\d{1,2}:\d{2}[\.,]\d{3})[^\n]*\n(.*?)(?=\n\s*\n|\Z)",
+        re.DOTALL
+    )
+
+    events = []
+    for match in pattern.finditer(content):
+        start_s = _vtt_time_to_seconds(match.group(1))
+        end_s = _vtt_time_to_seconds(match.group(2))
+        raw_txt = re.sub(r"<[^>]+>", "", match.group(3)).replace("\n", " ").strip()
+        words = [w for w in raw_txt.split() if w]
+        if not words or end_s <= start_s:
+            continue
+
+        # 2-3 kelimelik dinamik bloklara böl
+        chunks = []
+        i = 0
+        while i < len(words):
+            step = 2 if (len(words) - i) != 3 else 3
+            chunks.append(words[i:i + step])
+            i += step
+
+        total_chars = sum(len("".join(c)) for c in chunks) or 1
+        curr_t = start_s
+
+        for idx, chunk in enumerate(chunks):
+            chunk_chars = len("".join(chunk)) or 1
+            dur = (end_s - start_s) * (chunk_chars / total_chars)
+            next_t = end_s if idx == len(chunks) - 1 else min(end_s, curr_t + dur)
+
+            # En uzun/vurgulu kelimeyi parlak sarı (&H0000FFFF&) yap
+            upper_words = [w.upper() for w in chunk]
+            longest_idx = max(range(len(upper_words)), key=lambda k: len(re.sub(r"\W", "", upper_words[k])))
+            formatted_words = []
+            for w_i, uw in enumerate(upper_words):
+                safe_w = uw.replace("{", "").replace("}", "")
+                if w_i == longest_idx and len(safe_w) >= 3:
+                    formatted_words.append(r"{\c&H0000FFFF&}" + safe_w + r"{\c&H00FFFFFF&}")
+                else:
+                    formatted_words.append(safe_w)
+
+            line_text = " ".join(formatted_words)
+            events.append(
+                f"Dialogue: 0,{_seconds_to_ass_time(curr_t)},{_seconds_to_ass_time(next_t)},ViralShorts,,0,0,0,,{line_text}"
+            )
+            curr_t = next_t
+
+    if not events:
+        return False
+
+    with open(ass_path, "w", encoding="utf-8") as f:
+        f.write(header + "\n".join(events) + "\n")
+    return True
+
+
 def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
     print("2/6 - Doğal İngilizce seslendirme + Sinematik Dark Ambient arka plan müziği miksleniyor...")
     chosen_voice = "en-US-ChristopherNeural"
-    rate = "+0%" if is_long else "+5%"
+    rate = "+0%" if is_long else "+8%"
 
     subprocess.run([
         "edge-tts",
@@ -243,10 +345,12 @@ def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
     ]
     duration = float(subprocess.check_output(probe_cmd).decode("utf-8").strip())
 
+    fade_out_d = 4.0 if is_long else 0.8
+    fade_out_st = max(0.0, duration - fade_out_d)
     ambient_filter = (
         f"aevalsrc='0.12*sin(2*PI*110*t)+0.08*sin(2*PI*164.81*t)+0.06*sin(2*PI*220*t)+0.03*sin(2*PI*55*t)':s=44100:d={duration:.2f},"
-        "lowpass=f=280,afade=t=in:st=0:d=3,afade=t=out:st=" + f"{max(0, duration - 4):.2f}:d=4[bg];"
-        "[0:a]volume=1.15[vo];"
+        f"lowpass=f=280,afade=t=in:st=0:d=1.5,afade=t=out:st={fade_out_st:.2f}:d={fade_out_d:.2f}[bg];"
+        "[0:a]volume=1.18[vo];"
         "[vo][bg]amix=inputs=2:duration=first:dropout_transition=2"
     )
 
@@ -258,7 +362,7 @@ def generate_voiceover_and_ambient_audio(narration_text, is_long=False):
         "voice.m4a"
     ], check=True)
 
-    print(f"Ses + Atmosferik Müzik Miksajı tamamlandı ({duration / 60:.1f} dakika / {duration:.0f} sn).")
+    print(f"Ses + Atmosferik Müzik Miksajı tamamlandı ({duration / 60:.1f} dakika / {duration:.1f} sn).")
     return duration
 
 
@@ -319,7 +423,7 @@ def generate_ai_cinematic_clip(query, filename, duration, is_long=False):
         if os.path.exists(img_file) and os.path.getsize(img_file) > 10000:
             vf = (
                 f"scale={scale_w}:{scale_h}:force_original_aspect_ratio=increase,"
-                f"crop={w}:{h}:'((iw-ow)/2)+((iw-ow)/3)*sin(t/4.0)':'((ih-oh)/2)+((ih-oh)/3)*cos(t/4.0)',"
+                f"crop={w}:{h}:'((iw-ow)/2)+((iw-ow)/3)*sin(t/3.2)':'((ih-oh)/2)+((ih-oh)/3)*cos(t/3.2)',"
                 "eq=brightness=-0.12:contrast=1.18:saturation=0.85,fps=30,format=yuv420p"
             )
             subprocess.run([
@@ -342,7 +446,8 @@ def generate_ai_cinematic_clip(query, filename, duration, is_long=False):
 
 
 def download_background_videos(search_terms, total_duration, is_long=False):
-    target_count = 20 if is_long else 5
+    # Shorts için 8 sahne (~3.3 sn/sahne) yüksek tempo sağlar; Long için 20 sahne
+    target_count = 20 if is_long else 8
     print(f"3/6 - {target_count} adet sinematik sahne indiriliyor/üretiliyor...")
     fallback_terms = [
         "dark ocean", "storm clouds", "night city", "forest fog", "stars night",
@@ -353,7 +458,7 @@ def download_background_videos(search_terms, total_duration, is_long=False):
         terms.append(random.choice(fallback_terms))
 
     downloaded_files = []
-    segment_duration = (total_duration / float(target_count)) + 0.8
+    segment_duration = (total_duration / float(target_count)) + 0.6
 
     for idx, term in enumerate(terms):
         filename = f"raw_clip_{idx}.mp4"
@@ -377,19 +482,20 @@ def download_background_videos(search_terms, total_duration, is_long=False):
 
 def assemble_final_video(clip_files, total_duration, is_long=False):
     w, h = (1920, 1080) if is_long else (1080, 1920)
-    print(f"4/6 - FFmpeg ile {w}x{h} sinematik renk düzenlemesi, geçişler ve altyazı montajlanıyor...")
-    segment_duration = (total_duration / len(clip_files)) + 0.35
+    print(f"4/6 - FFmpeg ile {w}x{h} sinematik renk düzenlemesi, hızlı geçişler ve dinamik altyazı montajlanıyor...")
+    segment_duration = (total_duration / len(clip_files)) + 0.25
     processed_clips = []
 
     for idx, clip in enumerate(clip_files):
         out_clip = f"norm_clip_{idx}.mp4"
-        fade_out_st = max(0.1, segment_duration - 0.45)
+        fade_d = 0.4 if is_long else 0.15
+        fade_out_st = max(0.1, segment_duration - fade_d)
         vf_filter = (
             f"scale={w}:{h}:force_original_aspect_ratio=increase,"
             f"crop={w}:{h},"
-            "eq=brightness=-0.12:contrast=1.16:saturation=0.88,"
+            "eq=brightness=-0.12:contrast=1.18:saturation=0.88,"
             "vignette=PI/5,"
-            f"fade=t=in:st=0:d=0.4,fade=t=out:st={fade_out_st:.2f}:d=0.4,"
+            f"fade=t=in:st=0:d={fade_d:.2f},fade=t=out:st={fade_out_st:.2f}:d={fade_d:.2f},"
             "fps=30,format=yuv420p"
         )
         cmd = [
@@ -415,26 +521,29 @@ def assemble_final_video(clip_files, total_duration, is_long=False):
     ], check=True)
 
     if is_long:
-        sub_style = (
+        sub_filter = (
             "subtitles=subs.vtt:force_style='"
             "Alignment=2,Fontname=DejaVu Sans,Fontsize=18,Bold=1,"
             "PrimaryColour=&H00E6F5FF,OutlineColour=&H00000000,"
             "BorderStyle=1,Outline=2,Shadow=1,MarginV=38'"
         )
     else:
-        sub_style = (
-            "subtitles=subs.vtt:force_style='"
-            "Alignment=10,Fontname=DejaVu Sans,Fontsize=16,Bold=1,"
-            "PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,"
-            "BorderStyle=1,Outline=2,Shadow=1,MarginL=25,MarginR=25'"
-        )
+        if build_dynamic_shorts_ass("subs.vtt", "dynamic_subs.ass"):
+            sub_filter = "ass=dynamic_subs.ass"
+        else:
+            sub_filter = (
+                "subtitles=subs.vtt:force_style='"
+                "Alignment=10,Fontname=DejaVu Sans,Fontsize=18,Bold=1,"
+                "PrimaryColour=&H0000FFFF,OutlineColour=&H00000000,"
+                "BorderStyle=1,Outline=3,Shadow=1,MarginL=25,MarginR=25'"
+            )
 
     output_name = "final_output.mp4"
     subprocess.run([
         "ffmpeg", "-y",
         "-i", "merged_bg.mp4",
         "-i", "voice.m4a",
-        "-vf", sub_style,
+        "-vf", sub_filter,
         "-map", "0:v:0",
         "-map", "1:a:0",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
