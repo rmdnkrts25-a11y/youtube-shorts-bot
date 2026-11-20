@@ -10,3 +10,4 @@ The Backfire Effect
 Reactance Theory
 The Forer Effect
 The Arrival Fallacy
+The Sunk Cost Fallacy
