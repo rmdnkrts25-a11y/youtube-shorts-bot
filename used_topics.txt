@@ -11,3 +11,4 @@ Reactance Theory
 The Forer Effect
 The Arrival Fallacy
 The Sunk Cost Fallacy
+The Othello Error
