@@ -14,3 +14,4 @@ The Sunk Cost Fallacy
 The Othello Error
 The Burden of Potential
 The Moral Licensing Effect
+The Anchoring Effect
