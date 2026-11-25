@@ -15,3 +15,4 @@ The Othello Error
 The Burden of Potential
 The Moral Licensing Effect
 The Anchoring Effect
+The Third-Person Effect
